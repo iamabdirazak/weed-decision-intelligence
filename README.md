@@ -12,13 +12,13 @@ Weed Decision Intelligence is a model that decides, plant by plant, whether a sp
 
 **Detection.** A YOLO11n detector, fine-tuned on crops and weeds, finds every plant in the frame and gives each one a crop confidence and a weed confidence. A detector normally discards anything below a confidence of 0.25. Here every detection down to 0.01 is kept, because a weed seen faintly is still a weed the sprayer can reach. The detector is the only learned part of the model, at 2.6 million parameters.
 
-**Weed score.** Each plant receives one score, its weed confidence divided by the sum of its weed and crop confidence. The score reads as the share of the detector's belief that points to weed, which stays meaningful when both confidences are low, as they are for faint plants. A weed the detector does not find at all scores 0, so it counts against the promise instead of disappearing from it.
+**Scoring.** Each plant receives one score, its weed confidence divided by the sum of its weed and crop confidence. The score reads as the share of the detector's belief that points to weed, which stays meaningful when both confidences are low, as they are for faint plants. A weed the detector does not find at all scores 0, so it counts against the promise instead of disappearing from it.
 
 **Conditions.** The model is calibrated separately for seven conditions a moving sprayer meets: clean images, motion blur of 9, 17 and 31 pixels as ground speed rises, low light at 50% and 25% exposure, and glare from overexposure in direct sun. Each condition degrades the detector differently, so each needs its own threshold.
 
 **Calibration.** For every calibration field, the model finds the largest threshold that would have kept that field within the promise. It then chooses the threshold that 9 in 10 of those fields can tolerate. Because the choice is made over whole fields rather than individual plants, the promise carries over to new fields in the same way. One threshold is stored for every condition and promise, a table of 28 values.
 
-**Decision.** Every plant whose weed score reaches the threshold is sprayed. If no threshold above zero keeps the promise under the current condition, the model reports the promise as not achievable and sprays every plant, so the cost of a hard condition is extra spray, never missed weeds.
+**Output.** Every plant whose weed score reaches the threshold is sprayed. If no threshold above zero keeps the promise under the current condition, the model reports the promise as not achievable and sprays every plant, so the cost of a hard condition is extra spray, never missed weeds.
 
 ## How It Performs
 
@@ -71,7 +71,7 @@ Each part of the model was removed in turn and the model recalibrated on the sam
 - **Faint detections.** With the standard 0.25 cutoff in place of 0.01, no combination is achievable. Too many weeds sit below the cutoff for any threshold to recover them.
 - **Undetected weeds.** If weeds the detector never finds are left out of calibration, the model reports every combination as achievable, including low light at 25%, where it then keeps a 10% promise in only 25% of fields. Counting them is what lets the model recognise a condition it cannot handle.
 - **One threshold per condition.** A single threshold shared by all conditions must suit the hardest one. Only the 20% promise remains achievable, at 84% to 98% of crops sprayed.
-- **Weed score.** Using the weed confidence alone in place of the weed share raises the crops sprayed from 35.6% to 39.4% on average across the achievable combinations.
+- **Scoring.** Using the weed confidence alone in place of the weed share raises the crops sprayed from 35.6% to 39.4% on average across the achievable combinations.
 
 ## How It Was Trained
 

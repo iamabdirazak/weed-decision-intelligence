@@ -9,6 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle, FancyBboxPatch, Polygon
+from matplotlib.path import Path as Shape
 from PIL import Image
 
 from src.paths import ROOT
@@ -48,67 +49,103 @@ def leaf(axis, x, y, size, color, angle=0.0, z=5):
         axis.add_patch(Polygon(outline + (x, y), facecolor=color, edgecolor="none", zorder=z))
 
 
+S = 2.6 / 262  # the first figure's icons were drawn on 262-unit cards
+
+
+def single_leaf(axis, cx, cy, length, color, z=6):
+    """One leaf on a diagonal, with its midrib."""
+    t = np.linspace(0, 1, 60)
+    half = length * 0.3 * np.sin(np.pi * t) ** 0.9
+    along = (t - 0.5) * length
+    outline = np.r_[np.c_[along, half], np.c_[along, -half][::-1]]
+    turn = np.radians(45)
+    rotate = np.array([[np.cos(turn), -np.sin(turn)], [np.sin(turn), np.cos(turn)]])
+    axis.add_patch(Polygon(outline @ rotate.T + (cx, cy), facecolor=color, edgecolor="none", zorder=z))
+    rib = np.c_[np.linspace(-0.62, 0.3, 2) * length, [0, 0]] @ rotate.T + (cx, cy)
+    axis.plot(rib[:, 0], rib[:, 1], color=CARD, linewidth=1.6, solid_capstyle="round", zorder=z + 1)
+
+
+def at(cx, cy, x, y):
+    """A point from the first figure's icon space (y down, centred on 192) into the card."""
+    return cx + x * S, cy - (y - 192) * S
+
+
+def box(axis, cx, cy, x, y, w, h, r, color, alpha=1.0, z=4):
+    left, top = at(cx, cy, x, y)
+    axis.add_patch(FancyBboxPatch((left, top - h * S), w * S, h * S, boxstyle=f"round,pad=0,rounding_size={r * S}",
+                                  facecolor=color, edgecolor="none", alpha=alpha, zorder=z))
+
+
+def arc(axis, cx, cy, x, y, r, start, end, color, width, alpha=1.0, z=4):
+    """An arc in degrees, counter-clockwise from the right, in the icon space."""
+    t = np.radians(np.linspace(start, end, 80))
+    px, py = at(cx, cy, x + r * np.cos(t), y - r * np.sin(t))
+    axis.plot(px, py, color=color, linewidth=width, alpha=alpha, solid_capstyle="round", zorder=z)
+
+
 def icon_image(axis, cx, cy):
-    """A field photograph: soil with rows of plants."""
-    rounded(axis, cx - 0.7, cy - 0.5, 1.4, 1.0, FAINT, 0.1)
-    for index, (x, y, color) in enumerate(((-0.4, 0.12, SOFT), (0.0, 0.12, SOFT), (0.4, 0.12, SOFT),
-                                           (-0.2, -0.32, BASE), (0.25, -0.32, SOFT))):
-        leaf(axis, cx + x, cy + y - 0.08, 0.26, color)
+    """Camera frames arriving one after another."""
+    cx -= 14 * S
+    for x, y, alpha in ((-62, 172, 0.3), (-48, 158, 0.55), (-34, 144, 1.0)):
+        box(axis, cx, cy, x, y, 96, 68, 12, BASE, alpha, z=3 + alpha)
+    axis.add_patch(Polygon([at(cx, cy, 4, 168), at(cx, cy, 24, 178), at(cx, cy, 4, 188)],
+                           facecolor=style.NEUTRAL["ink"], edgecolor="none", zorder=5))
 
 
 def icon_detect(axis, cx, cy):
-    """Plants found with boxes, including a faint one that is kept."""
-    for x, y, size, color, faint in ((-0.36, 0.2, 0.32, SOFT, False), (0.36, 0.2, 0.32, BASE, False),
-                                     (0.0, -0.36, 0.3, BASE, True)):
-        leaf(axis, cx + x, cy + y - size * 0.45, size, MUTED if faint else color)
-        box = FancyBboxPatch((cx + x - size * 0.62, cy + y - size * 0.55), size * 1.24, size * 1.15,
-                             boxstyle="round,pad=0,rounding_size=0.05", facecolor="none",
-                             edgecolor=MUTED if faint else STRONG, linewidth=1.4,
-                             linestyle=(0, (2, 2)) if faint else "-", zorder=6)
-        axis.add_patch(box)
+    """A viewfinder closing on a leaf."""
+    half, reach, r = 0.42, 0.16, 0.09
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            t = np.radians(np.linspace(0, 90, 20))
+            corner = np.c_[half - r + r * np.cos(t), half - r + r * np.sin(t)]
+            path = np.r_[[[half, half - reach]], corner, [[half - reach, half]]]
+            axis.plot(cx + sx * path[:, 0], cy + sy * path[:, 1], color=BASE, linewidth=2.6,
+                      solid_capstyle="round", zorder=5)
+    single_leaf(axis, cx, cy, 0.46, STRONG)
 
 
 def icon_score(axis, cx, cy):
-    """Crop and weed confidence become one share between 0 and 1."""
-    rounded(axis, cx - 0.62, cy + 0.18, 0.5, 0.16, SOFT, 0.06)
-    rounded(axis, cx - 0.62, cy - 0.06, 0.82, 0.16, BASE, 0.06)
-    rounded(axis, cx - 0.62, cy - 0.46, 1.24, 0.1, FAINT, 0.05)
-    share = 0.82 / (0.82 + 0.5)
-    rounded(axis, cx - 0.62, cy - 0.46, 1.24 * share, 0.1, BASE, 0.05, z=4)
-    axis.add_patch(Circle((cx - 0.62 + 1.24 * share, cy - 0.41), 0.1, facecolor=STRONG, edgecolor="none", zorder=5))
+    """Weed shares of a few plants, one bar each, with the weed standing out."""
+    heights, width, gap = (0.34, 0.58, 0.9, 0.46), 0.2, 0.1
+    left = cx - (len(heights) * width + (len(heights) - 1) * gap) / 2
+    base = cy - 0.45
+    for index, height in enumerate(heights):
+        rounded(axis, left + index * (width + gap), base, width, height, STRONG if index == 2 else SOFT, 0.07, z=4)
+    axis.plot([left - 0.08, left + 4 * width + 3 * gap + 0.08], [base - 0.07, base - 0.07], color=MUTED,
+              linewidth=1.6, solid_capstyle="round", zorder=4)
 
 
 def icon_conditions(axis, cx, cy):
-    """The same plant, clean, blurred and in low light."""
-    for index, (shade, blur) in enumerate(((SOFT, 0), (SOFT, 1), (MUTED, 0))):
-        x = cx - 0.66 + index * 0.46
-        rounded(axis, x, cy - 0.32, 0.4, 0.64, FAINT if index < 2 else "#22261A", 0.07)
-        for offset in ((0.1, 0.05, 0.0) if blur else (0.0,)):
-            leaf(axis, x + 0.2, cy - 0.2 + offset, 0.24, MUTED if offset else shade, z=5 if offset == 0 else 4)
+    """Speed and light: a sun with motion lines trailing behind it."""
+    sx, sy, r = cx + 0.22, cy + 0.05, 0.2
+    axis.add_patch(Circle((sx, sy), r, facecolor=BASE, edgecolor="none", zorder=5))
+    for angle in np.radians(np.arange(0, 360, 45)):
+        axis.plot([sx + 0.3 * np.cos(angle), sx + 0.4 * np.cos(angle)],
+                  [sy + 0.3 * np.sin(angle), sy + 0.4 * np.sin(angle)], color=BASE, linewidth=2.2,
+                  solid_capstyle="round", zorder=5)
+    for dy, length, color in ((0.2, 0.24, MUTED), (0.0, 0.34, SOFT), (-0.2, 0.24, MUTED)):
+        axis.plot([cx - 0.7, cx - 0.7 + length], [sy + dy, sy + dy], color=color, linewidth=2.6,
+                  solid_capstyle="round", zorder=4)
 
 
 def icon_calibrate(axis, cx, cy):
-    """One safe threshold per field, and the threshold that keeps most of them within the promise."""
-    rng = np.random.default_rng(3)
-    xs = np.r_[rng.uniform(-0.62, -0.2, 3), rng.uniform(-0.05, 0.62, 9)]
-    for index, x in enumerate(np.sort(xs)):
-        axis.add_patch(Circle((cx + x, cy - 0.28 + (index % 3) * 0.2), 0.065,
-                              facecolor=MUTED if x < -0.12 else BASE, edgecolor="none", zorder=5))
-    axis.plot([cx - 0.12, cx - 0.12], [cy - 0.5, cy + 0.5], color=STRONG, linewidth=1.6,
-              linestyle=(0, (2.5, 2)), zorder=6)
+    """A range of scores with the threshold set inside it."""
+    box(axis, cx, cy, -66, 180, 44, 30, 8, BASE, 0.3)
+    box(axis, cx, cy, -22, 180, 44, 30, 0, BASE, 0.6)
+    box(axis, cx, cy, 22, 180, 44, 30, 8, BASE)
+    for x in (-23.5, 20.5):
+        box(axis, cx, cy, x, 152, 3, 86, 1.5, STRONG, z=6)
 
 
 def icon_decide(axis, cx, cy):
-    """A nozzle spraying the weed and skipping the crop."""
-    rounded(axis, cx - 0.2, cy + 0.32, 0.4, 0.22, SOFT, 0.06)
-    rng = np.random.default_rng(1)
-    for _ in range(14):
-        t = rng.uniform(0.1, 1)
-        x = rng.uniform(-1, 1) * 0.28 * t
-        axis.add_patch(Circle((cx + x, cy + 0.28 - t * 0.55), 0.03, facecolor=STRONG, edgecolor="none", zorder=5))
-    leaf(axis, cx, cy - 0.52, 0.3, BASE)
-    leaf(axis, cx - 0.58, cy - 0.52, 0.26, MUTED)
-    leaf(axis, cx + 0.58, cy - 0.52, 0.26, MUTED)
+    """A nozzle releasing a fan of spray."""
+    rounded(axis, cx - 0.24, cy + 0.3, 0.48, 0.2, SOFT, 0.07, z=5)
+    rounded(axis, cx - 0.09, cy + 0.18, 0.18, 0.14, BASE, 0.04, z=5)
+    for row, (y, count, spread) in enumerate(((cy + 0.02, 3, 0.16), (cy - 0.18, 5, 0.34), (cy - 0.4, 7, 0.52))):
+        for x in np.linspace(-spread, spread, count):
+            axis.add_patch(Circle((cx + x, y), 0.045 - row * 0.004, facecolor=STRONG if row < 2 else BASE,
+                                  edgecolor="none", zorder=5))
 
 
 def diagram(title: str, cards: list[tuple], name: str) -> None:
@@ -143,19 +180,18 @@ def diagram(title: str, cards: list[tuple], name: str) -> None:
 
 def architecture() -> None:
     diagram("Model Architecture", [
-        ("Input", "Field image", icon_image),
+        ("Input", "Camera frames", icon_image),
         ("Detection", "Faint plants kept", icon_detect),
-        ("Weed score", "Weed share per plant", icon_score),
+        ("Scoring", "Weed share per plant", icon_score),
         ("Conditions", "Blur, low light, glare", icon_conditions),
         ("Calibration", "Threshold per condition", icon_calibrate),
-        ("Decision", "Spray or skip", icon_decide),
+        ("Output", "Spray or skip", icon_decide),
     ], "architecture")
 
 
 # The model as a file -------------------------------------------------------
 
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.path import Path as Shape
 from matplotlib.patches import PathPatch
 
 
