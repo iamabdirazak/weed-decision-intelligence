@@ -1,0 +1,21 @@
+[project]
+name = "weed-decision-intelligence"
+version = "0.1.0"
+description = "Spray or skip decisions for every plant, with a weed miss rate that holds field by field."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Abdirazak Mubarak" }]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+    "opencv-python",
+    "onnx",
+    "onnxruntime",
+    "matplotlib",
+    "pillow",
+]
+
+[project.optional-dependencies]
+training = ["ultralytics"]
+test = ["pytest"]

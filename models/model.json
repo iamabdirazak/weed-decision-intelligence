@@ -1,0 +1,59 @@
+{
+  "name": "Weed Decision Model",
+  "task": "Spray or skip for every plant in a field image, with a promised weed miss rate per field",
+  "detector": {
+    "file": "detector.onnx",
+    "architecture": "YOLO11n, fine-tuned on CropAndWeed (CropOrWeed2)",
+    "input": "BGR image, letterboxed to 640 x 640",
+    "classes": [
+      "crop",
+      "weed"
+    ],
+    "parameters": 2639336,
+    "lowest_confidence_kept": 0.01
+  },
+  "calibration": {
+    "file": "thresholds.json",
+    "fields": "149 calibration field visits, 88 with at least 20 weeds",
+    "promise_holds_in": "at least 90% of new fields",
+    "conditions": [
+      "clean",
+      "blur_9",
+      "blur_17",
+      "blur_31",
+      "dark_50",
+      "dark_25",
+      "bright_180"
+    ],
+    "promises": [
+      "0.05",
+      "0.10",
+      "0.15",
+      "0.20"
+    ]
+  },
+  "test": {
+    "fields": "121 field visits never seen in training or calibration, 69 with at least 20 weeds",
+    "share_of_fields_within_promise": {
+      "0.05/blur_9": 0.899,
+      "0.10/clean": 0.928,
+      "0.10/blur_9": 0.928,
+      "0.10/blur_17": 0.899,
+      "0.10/blur_31": 0.87,
+      "0.15/clean": 0.913,
+      "0.15/blur_9": 0.942,
+      "0.15/blur_17": 0.928,
+      "0.15/blur_31": 0.884,
+      "0.20/clean": 0.957,
+      "0.20/blur_9": 0.957,
+      "0.20/blur_17": 0.942,
+      "0.20/blur_31": 0.928,
+      "0.20/dark_50": 0.899
+    }
+  },
+  "limits": [
+    "Calibrated on CropAndWeed field visits; a new crop, region or camera needs new calibration fields.",
+    "Conditions are simulated on the images, not recorded on a moving machine.",
+    "Under strong low light and glare no threshold keeps the promise, and every plant is sprayed."
+  ]
+}

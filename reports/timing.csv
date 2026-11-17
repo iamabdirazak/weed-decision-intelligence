@@ -1,0 +1,3 @@
+model,milliseconds,pi5_estimate,machine
+stock YOLO11n,29.4,147.3,arm64
+detector,31.2,156.3,arm64

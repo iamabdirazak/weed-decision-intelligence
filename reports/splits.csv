@@ -1,0 +1,5 @@
+split,field_visits,images,crops,weeds
+train,553,4625,12767,33243
+val,90,770,2485,4327
+calib,149,1160,2239,10291
+test,121,1150,3274,9662
