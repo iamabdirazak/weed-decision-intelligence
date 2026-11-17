@@ -253,7 +253,7 @@ def onnx_mark() -> np.ndarray:
 def model_file() -> None:
     """The released model shown as what it is: a single ONNX file."""
     style.apply()
-    width, height = 6 * CARD_W + 5 * GAP + 2 * MARGIN, 7.2
+    width, height = 7 * CARD_W + 6 * GAP + 2 * MARGIN, 7.2  # the hero size shared by every repo
     figure, axis = plt.subplots(figsize=(width / 1.45, height / 1.45))
     axis.set_xlim(0, width)
     axis.set_ylim(0, height)
